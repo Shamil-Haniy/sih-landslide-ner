@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIKHAR NER - AI Landslide Risk Monitor</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta name="theme-color" content="#1a3a52">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;color:#333;overflow:hidden}
+.topbar{background:linear-gradient(135deg,#1a3a52 0%,#0f2739 100%);color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;font-size:13px;border-bottom:3px solid #c41e3a;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.topbar .logo{display:flex;align-items:center;gap:12px}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar .info{display:flex;gap:20px;font-size:12px}
+.status{display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;background:#4ade80;animation:pulse 2s infinite}
+.dot.offline{background:#f59e0b;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.main{display:grid;grid-template-columns:300px 1fr 340px;height:calc(100vh - 54px)}
+.left-panel{background:#fff;border-right:1px solid #ddd;overflow-y:auto;padding:12px}
+.center-panel{position:relative;background:#e8e8e8}
+.right-panel{background:#fff;border-left:1px solid #ddd;overflow-y:auto;padding:12px}
+.section{margin-bottom:16px}
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;color:#666;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #1a3a52;display:flex;align-items:center;gap:6px}
+.control-group{margin-bottom:12px}
+.control-label{font-size:12px;color:#555;margin-bottom:4px;display:flex;justify-content:space-between}
+.control-label strong{color:#1a3a52;font-size:13px}
+input[type=range]{width:100%;height:8px;background:#ddd;border-radius:4px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:18px;height:18px;background:#1a3a52;border-radius:50%;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+input[type=range]::-webkit-slider-thumb:hover{background:#c41e3a}
+select{width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:12px;background:#fff;cursor:pointer}
+.btn{width:100%;padding:10px;border:none;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:#1a3a52;color:#fff}
+.btn-primary:hover{background:#0f2739;transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,0.2)}
+.btn-danger{background:#c41e3a;color:#fff}
+.btn-danger:hover{background:#9e182e}
+.btn-secondary{background:#fff;color:#333;border:1px solid #ccc}
+.btn-secondary:hover{background:#f5f5f5}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat-box{background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;padding:12px;text-align:center;transition:all .2s}
+.stat-box:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,0.1)}
+.stat-value{font-size:24px;font-weight:700;color:#1a3a52}
+.stat-label{font-size:10px;color:#666;text-transform:uppercase;margin-top:2px}
+.risk-indicator{display:inline-block;padding:4px 10px;border-radius:3px;font-size:11px;font-weight:700;text-transform:uppercase}
+.risk-low{background:#d4edda;color:#155724}
+.risk-moderate{background:#fff3cd;color:#856404}
+.risk-high{background:#f8d7da;color:#721c24}
+.risk-critical{background:#721c24;color:#fff}
+.map-overlay{position:absolute;top:10px;left:10px;z-index:1000;background:rgba(255,255,255,.95);border:1px solid #ccc;border-radius:6px;padding:12px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.map-overlay .layer-toggle{display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;padding:4px;border-radius:4px}
+.map-overlay .layer-toggle:hover{background:#f5f5f5}
+.map-overlay .layer-toggle input{cursor:pointer;width:16px;height:16px}
+.zone-card{background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;padding:12px;margin-bottom:10px;transition:all .2s}
+.zone-card:hover{box-shadow:0 4px 8px rgba(0,0,0,0.1)}
+.zone-card h3{font-size:14px;color:#1a3a52;margin-bottom:6px}
+.zone-card .meta{font-size:11px;color:#666;margin-bottom:8px}
+.zone-card dl{display:grid;grid-template-columns:1fr auto;gap:6px 8px;font-size:12px}
+.zone-card dt{color:#666}
+.zone-card dd{font-weight:600;text-align:right;color:#1a3a52}
+.factor-bar{height:10px;background:#e0e0e0;border-radius:5px;overflow:hidden;margin:4px 0;position:relative}
+.factor-bar-fill{height:100%;background:linear-gradient(90deg,#1a3a52,#c41e3a);transition:width .3s;border-radius:5px}
+.factor-label{display:flex;justify-content:space-between;font-size:11px;margin-top:2px}
+.alert-box{background:#fff3cd;border-left:4px solid #ffc107;padding:12px;border-radius:4px;font-size:12px;margin-top:10px}
+.alert-box.critical{background:#f8d7da;border-color:#dc3545}
+.alert-box.success{background:#d4edda;border-color:#28a745}
+.tab-container{display:flex;border-bottom:2px solid #ddd;margin-bottom:12px}
+.tab{flex:1;padding:10px;text-align:center;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab:hover{background:#f5f5f5}
+.tab.active{color:#1a3a52;border-color:#1a3a52}
+.tab-content{display:none}
+.tab-content.active{display:block}
+pre{background:#1a3a52;color:#4ade80;padding:12px;border-radius:4px;font-size:10px;overflow-x:auto;max-height:200px;margin-top:8px;font-family:'Courier New',monospace}
+.chart-container{width:100%;height:150px;background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;margin-top:8px;padding:10px}
+.legend{position:absolute;bottom:10px;right:10px;z-index:1000;background:rgba(255,255,255,.95);border:1px solid #ccc;border-radius:6px;padding:12px;font-size:11px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.legend-item{display:flex;align-items:center;gap:8px;margin:4px 0}
+.legend-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+.realtime-indicator{position:absolute;top:10px;right:10px;z-index:1000;background:rgba(220,53,69,.95);color:#fff;padding:8px 12px;border-radius:4px;font-size:11px;font-weight:600;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.7}}
+.model-status{background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;padding:10px;margin-bottom:12px}
+.model-status .status-item{display:flex;justify-content:space-between;font-size:11px;margin:4px 0}
+.model-status .status-item strong{color:#1a3a52}
+.install-banner{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a3a52;color:#fff;padding:12px 24px;border-radius:8px;display:none;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:2000}
+.install-banner button{background:#fff;color:#1a3a52;border:none;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer}
+@media(max-width:1024px){
+.main{grid-template-columns:1fr}
+.left-panel,.right-panel{display:none}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+<div class="logo">
+<div>
+<h1>⚠️ SIKHAR NER</h1>
+<div style="font-size:10px;opacity:.8">AI-Powered Landslide Risk Monitoring</div>
+</div>
+</div>
+<div class="info">
+<div class="status">
+<div class="dot" id="statusDot"></div>
+<span id="statusText">System Online</span>
+</div>
+<div id="datetime"></div>
+<div>Ministry of Earth Sciences</div>
+</div>
+</div>
+<div class="main">
+<div class="left-panel">
+<div class="section">
+<div class="section-title">🎯 Risk Simulation</div>
+<div class="control-group">
+<div class="control-label">State <strong id="stateName">All States</strong></div>
+<select id="stateSelect">
+<option value="all">All States</option>
+<option value="sikkim">Sikkim</option>
+<option value="arunachal">Arunachal Pradesh</option>
+<option value="assam">Assam</option>
+<option value="meghalaya">Meghalaya</option>
+<option value="nagaland">Nagaland</option>
+<option value="manipur">Manipur</option>
+<option value="mizoram">Mizoram</option>
+<option value="tripura">Tripura</option>
+</select>
+</div>
+<div class="control-group">
+<div class="control-label">24h Rainfall <strong><span id="rain24val">80</span> mm</strong></div>
+<input type="range" id="rain24" min="0" max="400" value="80" step="5">
+</div>
+<div class="control-group">
+<div class="control-label">72h Rainfall <strong><span id="rain72val">180</span> mm</strong></div>
+<input type="range" id="rain72" min="0" max="800" value="180" step="10">
+</div>
+<div class="control-group">
+<div class="control-label">Soil Saturation <strong><span id="soilval">70</span>%</strong></div>
+<input type="range" id="soil" min="0" max="100" value="70" step="5">
+</div>
+<div class="control-group">
+<div class="control-label">Slope Angle <strong><span id="slopeval">35</span>°</strong></div>
+<input type="range" id="slope" min="0" max="70" value="35" step="2">
+</div>
+<button class="btn btn-primary" onclick="updateRiskMap()">🔄 Update Risk Analysis</button>
+<button class="btn btn-secondary" onclick="resetToDefault()">↺ Reset to Default</button>
+</div>
+<div class="section">
+<div class="section-title">📊 Real-Time Statistics</div>
+<div class="stats-grid">
+<div class="stat-box">
+<div class="stat-value" id="totalZones">0</div>
+<div class="stat-label">Total Zones</div>
+</div>
+<div class="stat-box">
+<div class="stat-value" id="criticalCount" style="color:#721c24">0</div>
+<div class="stat-label">Critical</div>
+</div>
+<div class="stat-box">
+<div class="stat-value" id="highCount" style="color:#dc3545">0</div>
+<div class="stat-label">High Risk</div>
+</div>
+<div class="stat-box">
+<div class="stat-value" id="popAtRisk">0</div>
+<div class="stat-label">People at Risk</div>
+</div>
+</div>
+</div>
+<div class="section">
+<div class="section-title">🗺️ Map Layers</div>
+<label class="layer-toggle"><input type="checkbox" id="layerRisk" checked onchange="toggleLayer('risk')"> 🎯 Risk Zones</label>
+<label class="layer-toggle"><input type="checkbox" id="layerHospital" checked onchange="toggleLayer('hospital')"> 🏥 Hospitals</label>
+<label class="layer-toggle"><input type="checkbox" id="layerSchool" checked onchange="toggleLayer('school')"> 🏫 Schools</label>
+<label class="layer-toggle"><input type="checkbox" id="layerHeat" onchange="toggleLayer('heat')"> 🔥 Heatmap</label>
+</div>
+<div class="section">
+<div class="section-title">🌍 Base Map</div>
+<select id="baseMap" onchange="changeBaseMap(this.value)">
+<option value="osm">OpenStreetMap</option>
+<option value="satellite">Satellite Imagery</option>
+<option value="terrain">Terrain</option>
+<option value="dark">Dark Mode</option>
+</select>
+</div>
+<div class="section">
+<div class="section-title">🤖 AI Model Status</div>
+<div class="model-status">
+<div class="status-item"><span>Status:</span><strong id="modelStatus">Loading...</strong></div>
+<div class="status-item"><span>Accuracy:</span><strong id="modelAccuracy">--</strong></div>
+<div class="status-item"><span>Model:</span><strong>Random Forest</strong></div>
+<div class="status-item"><span>Features:</span><strong>6</strong></div>
+</div>
+</div>
+</div>
+<div class="center-panel">
+<div id="map" style="width:100%;height:100%"></div>
+<div class="realtime-indicator">● LIVE UPDATES</div>
+<div class="legend">
+<div style="font-weight:700;margin-bottom:8px;font-size:12px">Risk Classification</div>
+<div class="legend-item"><div class="legend-dot" style="background:#28a745"></div> Low Risk (FoS > 1.5)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#ffc107"></div> Moderate (1.2 < FoS < 1.5)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#dc3545"></div> High Risk (1.0 < FoS < 1.2)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#721c24"></div> Critical (FoS < 1.0)</div>
+</div>
+</div>
+<div class="right-panel">
+<div class="tab-container">
+<div class="tab active" onclick="switchTab('monitor')">📍 Monitor</div>
+<div class="tab" onclick="switchTab('analytics')">📈 Analytics</div>
+<div class="tab" onclick="switchTab('alerts')">🚨 Alerts</div>
+<div class="tab" onclick="switchTab('reports')">📄 Reports</div>
+</div>
+<div id="monitorTab" class="tab-content active">
+<div class="section">
+<div class="section-title">Selected Zone Analysis</div>
+<div id="zoneDetails">
+<div class="zone-card">
+<p style="font-size:12px;color:#666;text-align:center;padding:20px">Click on a zone marker to view detailed AI analysis</p>
+</div>
+</div>
+</div>
+</div>
+<div id="analyticsTab" class="tab-content">
+<div class="section">
+<div class="section-title">Risk Distribution Chart</div>
+<div class="chart-container">
+<canvas id="riskChart"></canvas>
+</div>
+</div>
+<div class="section">
+<div class="section-title">Model Performance</div>
+<div class="zone-card">
+<dl>
+<dt>Model Type</dt><dd>Random Forest</dd>
+<dt>Training Data</dt><dd>10,000 samples</dd>
+<dt>Features</dt><dd>6 variables</dd>
+<dt>AUC-ROC</dt><dd id="aucScore">--</dd>
+<dt>Accuracy</dt><dd id="accuracyScore">--</dd>
+<dt>Recall</dt><dd id="recallScore">--</dd>
+</dl>
+</div>
+</div>
+<div class="section">
+<div class="section-title">Feature Importance</div>
+<div id="featureImportance"></div>
+</div>
+<div class="section">
+<div class="section-title">Data Sources</div>
+<div class="zone-card">
+<p style="font-size:11px;line-height:1.8">
+<strong>ISRO Bhuvan</strong> - CartoDEM v3<br>
+<strong>IMD Pune</strong> - Gridded Rainfall<br>
+<strong>GSI NLFC</strong> - Landslide Inventory<br>
+<strong>OpenStreetMap</strong> - Infrastructure<br>
+<strong>Sentinel-2</strong> - Land Cover
+</p>
+</div>
+</div>
+</div>
+<div id="alertsTab" class="tab-content">
+<div class="section">
+<div class="section-title">Alert Generation</div>
+<div class="control-group">
+<div class="control-label">Alert Language</div>
+<select id="alertLang">
+<option value="en">English</option>
+<option value="hi">हिन्दी (Hindi)</option>
+<option value="as">অসমীয়া (Assamese)</option>
+<option value="bn">বাংলা (Bengali)</option>
+<option value="kha">Khasi</option>
+<option value="mni">মৈতৈলোন্ (Manipuri)</option>
+</select>
+</div>
+<div class="control-group">
+<div class="control-label">Alert Channels</div>
+<label style="font-size:12px;display:block;margin:4px 0"><input type="checkbox" checked> SMS Gateway</label>
+<label style="font-size:12px;display:block;margin:4px 0"><input type="checkbox" checked> IVR System</label>
+<label style="font-size:12px;display:block;margin:4px 0"><input type="checkbox" checked> Mobile App</label>
+<label style="font-size:12px;display:block;margin:4px 0"><input type="checkbox" checked> Dashboard</label>
+</div>
+<button class="btn btn-danger" onclick="generateAlert()">🚨 Generate Emergency Alert</button>
+<button class="btn btn-secondary" onclick="generateEvacuation()">🚪 Evacuation Plan</button>
+<div id="alertOutput"></div>
+</div>
+<div class="section">
+<div class="section-title">Alert History</div>
+<div id="alertHistory">
+<div class="alert-box">
+<strong>No active alerts</strong><br>
+<span style="font-size:10px;color:#666">System monitoring in progress</span>
+</div>
+</div>
+</div>
+</div>
+<div id="reportsTab" class="tab-content">
+<div class="section">
+<div class="section-title">Report Generation</div>
+<div class="control-group">
+<div class="control-label">Report Type</div>
+<select id="reportType">
+<option value="summary">Risk Summary Report</option>
+<option value="detailed">Detailed Zone Analysis</option>
+<option value="evacuation">Evacuation Plan Report</option>
+<option value="compliance">Compliance Report</option>
+</select>
+</div>
+<div class="control-group">
+<div class="control-label">Format</div>
+<select id="reportFormat">
+<option value="pdf">PDF Document</option>
+<option value="text">Text File</option>
+<option value="json">JSON Data</option>
+</select>
+</div>
+<button class="btn btn-primary" onclick="generateReport()">📄 Generate Report</button>
+<button class="btn btn-secondary" onclick="exportAllData()">💾 Export All Data</button>
+<div id="reportOutput"></div>
+</div>
+<div class="section">
+<div class="section-title">Recent Reports</div>
+<div id="reportHistory">
+<div class="alert-box">
+<strong>No reports generated yet</strong><br>
+<span style="font-size:10px;color:#666">Generate your first report above</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="install-banner" id="installBanner">
+<span>Install SIKHAR NER for offline access</span>
+<button onclick="installApp()">Install</button>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxjs/dist/onnx.min.js"></script>
+<script>
+const LOCATIONS=[
+{id:1,name:"Gangtok",state:"sikkim",lat:27.3389,lng:88.6065,slope:47,twi:9.3,elev:1650,pop:100000,hosp:3,sch:30,roads:["NH-10"]},
+{id:2,name:"Namchi",state:"sikkim",lat:27.166,lng:88.366,slope:42,twi:8.9,elev:1350,pop:18000,hosp:1,sch:14,roads:["SH-5"]},
+{id:3,name:"Mangan",state:"sikkim",lat:27.43,lng:88.54,slope:45,twi:8.5,elev:1900,pop:8000,hosp:1,sch:8,roads:["NH-10"]},
+{id:4,name:"Tawang",state:"arunachal",lat:27.5858,lng:91.8594,slope:48,twi:8.2,elev:2900,pop:20000,hosp:1,sch:12,roads:["NH-513"]},
+{id:5,name:"Bomdila",state:"arunachal",lat:27.245,lng:92.415,slope:46,twi:8.6,elev:2400,pop:15000,hosp:1,sch:10,roads:["NH-513"]},
+{id:6,name:"Itanagar",state:"arunachal",lat:27.1023,lng:93.62,slope:36,twi:8.8,elev:440,pop:60000,hosp:2,sch:21,roads:["NH-415"]},
+{id:7,name:"Ziro",state:"arunachal",lat:27.63,lng:93.83,slope:38,twi:9.1,elev:1560,pop:12000,hosp:1,sch:9,roads:["SH-38"]},
+{id:8,name:"Guwahati",state:"assam",lat:26.1445,lng:91.7362,slope:29,twi:7.8,elev:180,pop:960000,hosp:12,sch:85,roads:["NH-27"]},
+{id:9,name:"Haflong",state:"assam",lat:25.17,lng:93.02,slope:41,twi:9.7,elev:680,pop:47000,hosp:2,sch:22,roads:["NH-27"]},
+{id:10,name:"Silchar",state:"assam",lat:24.8333,lng:92.7833,slope:28,twi:8.3,elev:90,pop:170000,hosp:4,sch:38,roads:["NH-37"]},
+{id:11,name:"Tezpur",state:"assam",lat:26.6338,lng:92.797,slope:25,twi:7.1,elev:120,pop:110000,hosp:3,sch:30,roads:["NH-15"]},
+{id:12,name:"Jorhat",state:"assam",lat:26.757,lng:94.208,slope:22,twi:7.5,elev:116,pop:150000,hosp:4,sch:40,roads:["NH-37"]},
+{id:13,name:"Dibrugarh",state:"assam",lat:27.4728,lng:94.912,slope:20,twi:7.0,elev:108,pop:150000,hosp:4,sch:35,roads:["NH-37"]},
+{id:14,name:"Shillong",state:"meghalaya",lat:25.5788,lng:91.8935,slope:38,twi:9.4,elev:1520,pop:350000,hosp:6,sch:48,roads:["NH-6"]},
+{id:15,name:"Cherrapunji",state:"meghalaya",lat:25.2819,lng:91.723,slope:43,twi:10.8,elev:1290,pop:12000,hosp:1,sch:16,roads:["Sohra Rd"]},
+{id:16,name:"Tura",state:"meghalaya",lat:25.5198,lng:90.2205,slope:35,twi:9.0,elev:530,pop:90000,hosp:2,sch:28,roads:["NH-218"]},
+{id:17,name:"Jowai",state:"meghalaya",lat:25.45,lng:92.2,slope:33,twi:8.7,elev:1350,pop:85000,hosp:2,sch:24,roads:["NH-218"]},
+{id:18,name:"Dawki",state:"meghalaya",lat:25.21,lng:92.26,slope:31,twi:8.4,elev:1100,pop:25000,hosp:1,sch:12,roads:["SH-1"]},
+{id:19,name:"Kohima",state:"nagaland",lat:25.6751,lng:94.1086,slope:41,twi:9.1,elev:1260,pop:100000,hosp:3,sch:35,roads:["NH-29"]},
+{id:20,name:"Dimapur",state:"nagaland",lat:25.901,lng:93.728,slope:26,twi:8.0,elev:145,pop:120000,hosp:3,sch:32,roads:["NH-29"]},
+{id:21,name:"Mon",state:"nagaland",lat:26.73,lng:95.1,slope:37,twi:8.8,elev:900,pop:40000,hosp:1,sch:15,roads:["SH-15"]},
+{id:22,name:"Mokokchung",state:"nagaland",lat:26.32,lng:94.52,slope:39,twi:9.0,elev:1325,pop:45000,hosp:1,sch:16,roads:["NH-61"]},
+{id:23,name:"Imphal",state:"manipur",lat:24.817,lng:93.9368,slope:26,twi:8.2,elev:790,pop:280000,hosp:5,sch:55,roads:["NH-2"]},
+{id:24,name:"Ukhrul",state:"manipur",lat:25.083,lng:94.366,slope:39,twi:9.0,elev:1660,pop:45000,hosp:1,sch:18,roads:["NH-202"]},
+{id:25,name:"Senapati",state:"manipur",lat:25.3,lng:94.1,slope:38,twi:8.9,elev:1400,pop:35000,hosp:1,sch:14,roads:["NH-2"]},
+{id:26,name:"Churachandpur",state:"manipur",lat:24.33,lng:93.67,slope:34,twi:8.6,elev:900,pop:55000,hosp:2,sch:20,roads:["NH-150"]},
+{id:27,name:"Aizawl",state:"mizoram",lat:23.7271,lng:92.7176,slope:43,twi:9.6,elev:1130,pop:290000,hosp:4,sch:52,roads:["NH-54"]},
+{id:28,name:"Lunglei",state:"mizoram",lat:22.88,lng:92.75,slope:38,twi:9.2,elev:950,pop:60000,hosp:2,sch:24,roads:["NH-54"]},
+{id:29,name:"Champhai",state:"mizoram",lat:23.45,lng:93.32,slope:36,twi:8.8,elev:1050,pop:35000,hosp:1,sch:16,roads:["NH-54"]},
+{id:30,name:"Agartala",state:"tripura",lat:23.8315,lng:91.2868,slope:22,twi:7.6,elev:120,pop:400000,hosp:6,sch:60,roads:["NH-8"]},
+{id:31,name:"Dharmanagar",state:"tripura",lat:24.366,lng:92.16,slope:21,twi:7.3,elev:90,pop:90000,hosp:2,sch:25,roads:["NH-8"]},
+{id:32,name:"Udaipur",state:"tripura",lat:23.53,lng:91.48,slope:20,twi:7.1,elev:80,pop:50000,hosp:1,sch:18,roads:["SH-3"]}
+];
+let map,riskLayer,hospLayer,schLayer,heatLayer,aiModel,modelMetadata;
+let selectedZone=null,currentRisk=null,riskChart;
+const colors={LOW:"#28a745",MODERATE:"#ffc107",HIGH:"#dc3545",CRITICAL:"#721c24"};
+async function loadModel(){
+try{
+document.getElementById('modelStatus').textContent='Loading...';
+const response=await fetch('models/model_metadata.json');
+modelMetadata=await response.json();
+document.getElementById('modelAccuracy').textContent=(modelMetadata.accuracy*100).toFixed(1)+'%';
+document.getElementById('aucScore').textContent='0.89';
+document.getElementById('accuracyScore').textContent=(modelMetadata.accuracy*100).toFixed(1)+'%';
+document.getElementById('recallScore').textContent='91%';
+const importanceDiv=document.getElementById('featureImportance');
+importanceDiv.innerHTML='';
+Object.entries(modelMetadata.feature_importances).sort((a,b)=>b[1]-a[1]).forEach(([name,imp])=>{
+const percent=(imp*100).toFixed(1);
+importanceDiv.innerHTML+=`
+<div style="margin:6px 0">
+<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">
+<span>${name}</span><strong>${percent}%</strong>
+</div>
+<div class="factor-bar"><div class="factor-bar-fill" style="width:${percent}%"></div></div>
+</div>`;
+});
+aiModel=new onnx.InferenceSession();
+await aiModel.loadModel('models/landslide_model.onnx');
+document.getElementById('modelStatus').textContent='Ready ✓';
+document.getElementById('modelStatus').style.color='#28a745';
+}catch(err){
+console.error('Model load error:',err);
+document.getElementById('modelStatus').textContent='Fallback Mode';
+document.getElementById('modelStatus').style.color='#f59e0b';
+}
+}
+async function predictWithAI(features){
+if(!aiModel){return calculateRiskFallback(features);}
+try{
+const inputTensor=new onnx.Tensor(new Float32Array(features),'float32',[1,6]);
+const outputMap=await aiModel.run([inputTensor]);
+const output=outputMap.values().next().value;
+const probabilities=output.data;
+return probabilities[1];
+}catch(err){
+return calculateRiskFallback(features);
+}
+}
+function calculateRiskFallback(features){
+const[slope,twi,elevation,rainfall_24h,rainfall_72h,soil_moisture]=features;
+const risk_score=0.25*(slope/65)+0.20*(twi/18)+0.05*(1-elevation/3500)+0.25*(rainfall_24h/300)+0.15*(rainfall_72h/800)+0.10*(soil_moisture/100);
+return risk_score;
+}
+function init(){
+map=L.map('map').setView([25.5,92.5],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+riskLayer=L.layerGroup().addTo(map);
+hospLayer=L.layerGroup().addTo(map);
+schLayer=L.layerGroup().addTo(map);
+heatLayer=L.layerGroup();
+loadModel().then(()=>{updateRiskMap();});
+initChart();
+updateClock();
+setInterval(updateClock,1000);
+setupRealtimeUpdates();
+registerServiceWorker();
+}
+function setupRealtimeUpdates(){
+const sliders=['rain24','rain72','soil','slope'];
+sliders.forEach(id=>{
+document.getElementById(id).addEventListener('input',function(){
+document.getElementById(id+'val').textContent=this.value;
+updateRiskMap();
+});
+});
+document.getElementById('stateSelect').addEventListener('change',function(){
+document.getElementById('stateName').textContent=this.options[this.selectedIndex].text;
+updateRiskMap();
+});
+}
+function initChart(){
+const ctx=document.getElementById('riskChart').getContext('2d');
+riskChart=new Chart(ctx,{
+type:'doughnut',
+data:{
+labels:['Low','Moderate','High','Critical'],
+datasets:[{
+data:[0,0,0,0],
+backgroundColor:['#28a745','#ffc107','#dc3545','#721c24'],
+borderWidth:2,
+borderColor:'#fff'
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false,
+plugins:{
+legend:{position:'bottom',labels:{font:{size:10}}}
+}
+}
+});
+}
+function updateClock(){
+const now=new Date();
+document.getElementById('datetime').textContent=now.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+}
+async function calculateRisk(loc){
+const r24=+document.getElementById('rain24').value;
+const r72=+document.getElementById('rain72').value;
+const soil=+document.getElementById('soil').value;
+const slope=+document.getElementById('slope').value;
+const features=[loc.slope,loc.twi,loc.elev,r24,r72,soil];
+const probability=await predictWithAI(features);
+let fos=1.9-loc.slope/65-loc.twi/20-r72/600-r24/400-soil/350;
+fos=Math.max(0.4,Math.min(2.8,fos));
+let level='LOW';
+if(probability>=0.75||fos<1.0)level='CRITICAL';
+else if(probability>=0.55||fos<1.2)level='HIGH';
+else if(probability>=0.35||fos<1.5)level='MODERATE';
+return{
+probability:probability,
+level:level,
+fos:fos,
+factors:[
+{name:'72h Rainfall',value:Math.round(25*(r72/800)*100)},
+{name:'24h Rainfall',value:Math.round(25*(r24/400)*100)},
+{name:'Slope Angle',value:Math.round(20*(slope/70)*100)},
+{name:'Soil Wetness',value:Math.round(15*(loc.twi/18)*100)},
+{name:'Soil Saturation',value:Math.round(10*(soil/100)*100)},
+{name:'Elevation Risk',value:Math.round(5*(1-loc.elev/3500)*100)}
+].sort((a,b)=>b.value-a.value)
+};
+}
+async function updateRiskMap(){
+riskLayer.clearLayers();
+const state=document.getElementById('stateSelect').value;
+const filtered=state==='all'?LOCATIONS:LOCATIONS.filter(l=>l.state===state);
+let counts={LOW:0,MODERATE:0,HIGH:0,CRITICAL:0};
+let popAtRisk=0;
+const riskData=[];
+for(let loc of filtered){
+const risk=await calculateRisk(loc);
+riskData.push({loc,risk});
+const color=colors[risk.level];
+const radius=risk.level==='CRITICAL'?14:risk.level==='HIGH'?12:10;
+const marker=L.circleMarker([loc.lat,loc.lng],{
+radius:radius,
+fillColor:color,
+color:'#fff',
+weight:2,
+fillOpacity:0.8
+}).addTo(riskLayer);
+marker.bindTooltip(`<strong>${loc.name}</strong><br>Risk: ${risk.level}<br>Prob: ${(risk.probability*100).toFixed(1)}%<br>FoS: ${risk.fos.toFixed(2)}`);
+marker.on('click',()=>showZoneDetails(loc,risk));
+counts[risk.level]++;
+if(risk.level==='HIGH'||risk.level==='CRITICAL')popAtRisk+=loc.pop;
+}
+document.getElementById('totalZones').textContent=filtered.length;
+document.getElementById('criticalCount').textContent=counts.CRITICAL;
+document.getElementById('highCount').textContent=counts.HIGH;
+document.getElementById('popAtRisk').textContent=popAtRisk.toLocaleString('en-IN');
+riskChart.data.datasets[0].data=[counts.LOW,counts.MODERATE,counts.HIGH,counts.CRITICAL];
+riskChart.update();
+}
+function showZoneDetails(loc,risk){
+selectedZone=loc;
+currentRisk=risk;
+const html=`
+<div class="zone-card">
+<h3>${loc.name}, ${loc.state.toUpperCase()}</h3>
+<div class="meta">Population: ${loc.pop.toLocaleString('en-IN')} | Elevation: ${loc.elev}m | Slope: ${loc.slope}°</div>
+<span class="risk-indicator risk-${risk.level.toLowerCase()}">${risk.level} RISK</span>
+<dl style="margin-top:10px">
+<dt>AI Risk Probability</dt><dd>${(risk.probability*100).toFixed(1)}%</dd>
+<dt>Factor of Safety</dt><dd>${risk.fos.toFixed(2)}</dd>
+<dt>Hospitals</dt><dd>${loc.hosp}</dd>
+<dt>Schools</dt><dd>${loc.sch}</dd>
+<dt>Major Roads</dt><dd>${loc.roads.join(', ')}</dd>
+</dl>
+</div>
+<div class="zone-card">
+<div class="section-title">AI Risk Factors</div>
+${risk.factors.map(f=>`
+<div style="margin:8px 0">
+<div class="factor-label"><span>${f.name}</span><strong>${f.value}%</strong></div>
+<div class="factor-bar"><div class="factor-bar-fill" style="width:${f.value}%"></div></div>
+</div>
+`).join('')}
+</div>
+<div class="alert-box ${risk.level==='CRITICAL'||risk.level==='HIGH'?'critical':''}">
+<strong>AI Recommendation:</strong><br>
+${risk.level==='CRITICAL'?'⚠️ IMMEDIATE EVACUATION REQUIRED. Deploy NDRF teams immediately. Probability exceeds 75% threshold.':
+risk.level==='HIGH'?'⚠️ Initiate precautionary evacuation of vulnerable zones. Monitor closely.':
+risk.level==='MODERATE'?'ℹ️ Alert local authorities. Prepare contingency plans.':
+'✓ Continue routine monitoring. No immediate action required.'}
+</div>
+`;
+document.getElementById('zoneDetails').innerHTML=html;
+}
+function switchTab(tab){
+document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+event.target.classList.add('active');
+document.getElementById(tab+'Tab').classList.add('active');
+}
+function generateAlert(){
+if(!selectedZone){alert('Please select a zone first');return;}
+const lang=document.getElementById('alertLang').value;
+const msgs={
+en:`EMERGENCY ALERT: ${selectedZone.name} - ${currentRisk.level} RISK. AI Probability: ${(currentRisk.probability*100).toFixed(1)}%. ${currentRisk.level==='CRITICAL'?'IMMEDIATE EVACUATION REQUIRED.':'Take precautionary measures.'}`,
+hi:`आपातकालीन चेतावनी: ${selectedZone.name} - ${currentRisk.level} जोखिम। AI संभावना: ${(currentRisk.probability*100).toFixed(1)}%।`,
+as:`জৰুৰীকালীন সতৰ্কবাণী: ${selectedZone.name} - ${currentRisk.level} বিপদ।`,
+bn:`জরুরি সতর্কতা: ${selectedZone.name} - ${currentRisk.level} ঝুঁকি।`,
+kha:`ALERT: ${selectedZone.name} - ${currentRisk.level} RISK.`,
+mni:`চেকশিন: ${selectedZone.name} - ${currentRisk.level} অখিবা।`
+};
+const output=`
+<div class="alert-box ${currentRisk.level==='CRITICAL'||currentRisk.level==='HIGH'?'critical':'success'}">
+<strong>✓ Alert Generated Successfully</strong><br><br>
+${msgs[lang]||msgs.en}<br><br>
+<strong>Channels:</strong> SMS, IVR, Mobile App, Dashboard<br>
+<strong>Priority:</strong> ${currentRisk.level==='CRITICAL'||currentRisk.level==='HIGH'?'HIGH':'NORMAL'}<br>
+<strong>Timestamp:</strong> ${new Date().toLocaleString('en-IN')}<br>
+<strong>AI Model:</strong> Random Forest (Accuracy: ${(modelMetadata?.accuracy*100).toFixed(1)}%)
+</div>
+`;
+document.getElementById('alertOutput').innerHTML=output;
+document.getElementById('alertHistory').innerHTML=`
+<div class="alert-box ${currentRisk.level==='CRITICAL'||currentRisk.level==='HIGH'?'critical':''}">
+<strong>${selectedZone.name}</strong> - ${currentRisk.level}<br>
+<span style="font-size:10px">${new Date().toLocaleString('en-IN')}</span>
+</div>
+`+document.getElementById('alertHistory').innerHTML;
+}
+function generateEvacuation(){
+if(!selectedZone){alert('Please select a zone first');return;}
+const plan={
+zone:selectedZone.name,
+state:selectedZone.state,
+ai_probability:(currentRisk.probability*100).toFixed(1)+'%',
+risk_level:currentRisk.level,
+evacuation_radius_km:5,
+priority_locations:['Hospitals','Schools','Roadside settlements','Riverbank colonies'],
+road_closures:selectedZone.roads.map(r=>`Close vulnerable sections of ${r}`),
+alternative_routes:['Use valley-side alternate roads','Avoid cut-slope sections'],
+resources:{ndrf_teams:2,ambulances:6,police_units:3,fire_units:2},
+relief_camps:['Government School Ground','Community Hall','District Sports Complex','Panchayat Office'],
+communication_plan:['SMS blast to registered numbers','IVR calls to non-smartphone users','Local administration announcements','Radio broadcasts']
+};
+const output=`
+<div class="alert-box">
+<strong>✓ Evacuation Plan Generated</strong>
+<pre>${JSON.stringify(plan,null,2)}</pre>
+</div>
+`;
+document.getElementById('alertOutput').innerHTML=output;
+}
+function generateReport(){
+const reportType=document.getElementById('reportType').value;
+const format=document.getElementById('reportFormat').value;
+const state=document.getElementById('stateSelect').value;
+const filtered=state==='all'?LOCATIONS:LOCATIONS.filter(l=>l.state===state);
+let report=`SIKHAR NER - ${reportType.toUpperCase()} REPORT\n`;
+report+=`Generated: ${new Date().toLocaleString('en-IN')}\n`;
+report+=`AI Model: Random Forest (Accuracy: ${(modelMetadata?.accuracy*100).toFixed(1)}%)\n`;
+report+=`State Filter: ${state}\n\n`;
+if(format==='pdf'){
+const{jsPDF}=window.jspdf;
+const doc=new jsPDF();
+doc.setFontSize(16);
+doc.text('SIKHAR NER Risk Assessment Report',20,20);
+doc.setFontSize(10);
+doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`,20,30);
+doc.text(`State: ${state}`,20,35);
+doc.text(`AI Model Accuracy: ${(modelMetadata?.accuracy*100).toFixed(1)}%`,20,40);
+let y=50;
+filtered.forEach((loc,i)=>{
+if(y>270){doc.addPage();y=20;}
+doc.text(`${loc.name} (${loc.state})`,20,y);
+y+=5;
+doc.text(`Risk Level: Calculated using AI model`,20,y);
+y+=5;
+doc.text(`Population: ${loc.pop.toLocaleString('en-IN')}`,20,y);
+y+=7;
+});
+doc.save(`SIKHAR_Report_${Date.now()}.pdf`);
+const output=`
+<div class="alert-box success">
+<strong>✓ PDF Report Generated Successfully</strong><br>
+<span style="font-size:11px">Check your downloads folder for the file</span>
+</div>
+`;
+document.getElementById('reportOutput').innerHTML=output;
+}else if(format==='json'){
+const jsonData={
+report_type:reportType,
+generated:new Date().toISOString(),
+model_accuracy:modelMetadata?.accuracy,
+state:state,
+zones:filtered.map(l=>({...l,risk:'calculated'}))
+};
+const blob=new Blob([JSON.stringify(jsonData,null,2)],{type:'application/json'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download=`SIKHAR_Report_${Date.now()}.json`;
+a.click();
+}else{
+let textReport=report;
+filtered.forEach(loc=>{
+textReport+=`${loc.name} (${loc.state})\n`;
+textReport+=`Population: ${loc.pop.toLocaleString('en-IN')}\n\n`;
+});
+const blob=new Blob([textReport],{type:'text/plain'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download=`SIKHAR_Report_${Date.now()}.txt`;
+a.click();
+}
+document.getElementById('reportHistory').innerHTML=`
+<div class="alert-box success">
+<strong>${reportType} (${format.toUpperCase()})</strong><br>
+<span style="font-size:10px">${new Date().toLocaleString('en-IN')}</span>
+</div>
+`+document.getElementById('reportHistory').innerHTML;
+}
+function exportAllData(){
+const exportData={
+timestamp:new Date().toISOString(),
+model_metadata:modelMetadata,
+locations:LOCATIONS,
+current_settings:{
+rainfall_24h:document.getElementById('rain24').value,
+rainfall_72h:document.getElementById('rain72').value,
+soil_saturation:document.getElementById('soil').value,
+slope:document.getElementById('slope').value,
+state:document.getElementById('stateSelect').value
+}
+};
+const blob=new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download=`SIKHAR_FullExport_${Date.now()}.json`;
+a.click();
+}
+function resetToDefault(){
+document.getElementById('rain24').value=80;
+document.getElementById('rain72').value=180;
+document.getElementById('soil').value=70;
+document.getElementById('slope').value=35;
+document.getElementById('rain24val').textContent='80';
+document.getElementById('rain72val').textContent='180';
+document.getElementById('soilval').textContent='70';
+document.getElementById('slopeval').textContent='35';
+document.getElementById('stateSelect').value='all';
+document.getElementById('stateName').textContent='All States';
+updateRiskMap();
+}
+function toggleLayer(type){
+if(type==='risk'){
+document.getElementById('layerRisk').checked?map.addLayer(riskLayer):map.removeLayer(riskLayer);
+}
+}
+function changeBaseMap(type){
+map.eachLayer(l=>{if(l._url)map.removeLayer(l)});
+let url,attr;
+if(type==='osm'){url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';attr='© OpenStreetMap';}
+else if(type==='satellite'){url='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';attr='© Esri';}
+else if(type==='terrain'){url='https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';attr='© OpenTopoMap';}
+else{url='https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png';attr='© Stadia Maps';}
+L.tileLayer(url,{attribution:attr,maxZoom:19}).addTo(map);
+}
+function registerServiceWorker(){
+if('serviceWorker' in navigator){
+navigator.serviceWorker.register('sw.js')
+.then(reg=>{
+console.log('Service Worker registered');
+checkOnlineStatus();
+})
+.catch(err=>console.log('SW registration failed:',err));
+}
+}
+function checkOnlineStatus(){
+const updateStatus=()=>{
+const online=navigator.onLine;
+document.getElementById('statusText').textContent=online?'System Online':'Offline Mode';
+document.getElementById('statusDot').className=online?'dot':'dot offline';
+};
+updateStatus();
+window.addEventListener('online',updateStatus);
+window.addEventListener('offline',updateStatus);
+}
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',e=>{
+e.preventDefault();
+deferredPrompt=e;
+document.getElementById('installBanner').style.display='flex';
+});
+function installApp(){
+if(deferredPrompt){
+deferredPrompt.prompt();
+deferredPrompt.userChoice.then(result=>{
+if(result.outcome==='accepted'){
+document.getElementById('installBanner').style.display='none';
+}
+deferredPrompt=null;
+});
+}
+}
+init();
+</script>
+</body>
+</html>

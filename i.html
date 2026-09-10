@@ -1,0 +1,219 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIKHAR NER | Landslide Risk Monitor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+--bg:#f4f2ee;--panel:#fff;-e:d5cfc4;--text:#1a1a1a;--muted:#5c5c5c;
+--green:#1e4d2b;--green-lt:#2d6a3f;--green-dk:#143820;
+--low:#3e7a4f;--mod:#b8960f;-high:#c0392b;--crit:#7b1113;
+--radius:3px;--shadow:0 1px 2px rgba(0,0,0,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!importanl,body{height:100%}body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+header{background:var(--green);color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid var(--green-dk)}
+header h1{font-size:16px;font-weight:700;letter-spacing:.5px}
+header .sub{font-size:11px;opacity:.85}
+.hdr-right{display:flex;align-items:center;gap:12px;font-size:12px}
+.status{display:flex;align-items:center;gap:5px}
+.dot{width:8px;height:8px;border-radius:50%;background:#4ade80}
+.dot.off{background:#f59e0b}
+main{display:grid;griate-columns:1fr 360px;height:calc(100vh - 52px)}
+#map{height:100%}
+.sidebar{background:#eceae5;border-left:1px solid var(--line);overflow-y:auto;padding:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:12px;box-shadow:var(--shadow)}
+.cad h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;font-weight:600}
+.card h3{font-size:15px;margin-bottom:6px}
+label{display:block;ont-size:12px;color:var(--muted);margin:8px 0 4px}
+input[type=range]{width:100%;accent-color:var(--green)}
+select{width:100%;padding:7px;border:1px solid var(--line);border-rdius:var(--radius);font:inherit;background:#fff}
+.btn{display:block;width:100%;padding:9px;border:0;border-radius:var(--radius);font:inherit;font-weight:600;cursor:pointer;margin-top:10px;text-align:center}
+.btn-p{background:var(--green);color:#fff}
+.btn-p:hover{background:var(--green-lt)}
+.btn-s{background:#fff;color:var(--text);border:1px solid var(--line)}
+.btn-s:hover{background:#f0ede8}
+.badge{display:inline-block;padding:3px 9px;border-radius:2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.badge.low{background:#e8f5e9;color:var(--low)}
+.badge.moderate{bound:#fef9e7;color:var(--mod)}
+.badge.high{background:#fdecea;color:var(--high)}
+.badge.critical{bacground:#f9e5e5;color:var(--crit)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:varadius);padding:8px 4px;text-align:center}
+.stat .num{font-size:22px;font-weight:700;display:block}
+.stat .lbl{font-size:9px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px}
+.num.low{color:var(--low)}.num.moderate{color:var(--mod)}.num.high{color:var(--high)}.num.critical{color:var(--crit)}
+.meta{font-size:12px;color:var(--muted);margin:6px 0}
+dl{display:grid;grid-template-columns:1fr auto;gap:6px 10px;margin:10px 0}
+dt{font-size:12px;color:var(--muted)}
+dd{font-size:12px;font-weight:600;text-align:right}
+.facsplay:grid;grid-template-columns:110px 1fr 35px;gap:6px;align-items:center;margin-bottom:6px;font-size:12px}
+.factor .bar{height:6px;background:#e8e4da;border-radius:3px;overflow:hidden}
+.factor .baright:100%;background:var(--green)}
+.rec{margin-top:10px;padding:9px;background:#fff8e6;border-left:3px solid var(--mod);font-size:12px}
+pre{margin-top:10px;background:#111;color:#c8f7c8;padding:10px;border-raius:var(--radius);font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto}
+.legend{position:absolute;bottom:16px;right:376px;z-index:1000;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;font-size:11px;box-shadow:var(--shadow)}
+.leg-item{displa:flex;align-items:center;gap:6px;margin:3px 0}
+.leg-dot{width:9px;height:9px;border-radius:50%}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;margin:6px 0}
+.chk input{width:auto}
+.lang-select{margin-top:8px}
+@media(max-width:900px){
+main{grid-emplate-columns:1fr;grid-template-rows:50vh 50vh}
+.sidebar{border-left:0;border-top:1px solid var(--line)}
+.legend{right:12px;bottom:calc(50vh + 16px)}
+}
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>SIKHAR NER</h1>
+<div class="sub">Landslide Risk Monitoring System - North East Region</di/div>
+<div class="hdr-right">
+<divus"><div class="dot" id="statusDot"></div><span id="statusTxt">Online</span></div>
+<div id="clock"></di
+</header>
+<main>
+<div id="map"></div>
+<div class=legend">
+<div class="leg-item"><span class="leg-dot" style="background:var(--low)"></span>Low</div>
+<div class="leg-item"><span class="leg-dot" style="background:var(--mod)"></span>Moderate</div>
+<div class="leg-item"><span class="leg-dot" style="background:var(--high)"></span>High</div>
+<div class="leg-item"><span class="leg-dot" style="background:var(--crit)"></span>Critical</div>
+</div>
+<di class="sr">
+<div class="card">
+<h2>Rainfall Simulation</h2>
+<label>24h Rainfall: <strong id="r24v">60</strong> mm</label>
+<nput type="range" id="r24" min="0" max="300" value="60">
+<label>72h Rainfall: <strong id="r72v">140</strong> mm</label>
+<input type="range" id="r72" min="0" max="600" value="140">
+<button class="btn btn-p" id="updateBtn">Update Risk Map</button>
+</div
+<div class="card">
+<hisk Summary</h2>
+<div class="stats">
+<div class="stat"><span class="num low" id="cLow">0</span><span class="lbl">Low</span></div>
+<div class="stat"><span class="num moderate" id="cMod">0</span><span class="lbl">Mod</span></divclass="stat"><span class="num high" id="cHigh">0</span><span class="lbl">High</span></div>
+<div class="stat"><span class="num critical" id="cCrit">0</span><span class="lbl">Crit</span></div>
+</div
+</div>
+<div class="card"
+<h2>Map Layers</h2>
+<div class="chk"><input type="checkbox" id="lyrRisk" checked><label for="lyrRisk">Risk Zones</label></div>
+<div class="chk"><input type="checkbox" id="lyrInfra" checked><label for="lyrInfra">Hospitals / Schools</label></div>
+<select id="stateFilter"><option value="All">All States</option></select>
+</div>
+<dv class="card" id="zonePanel" hidden>
+<h2>Selected Zone</h2>
+<h3 id="zName">--</h3
+<span class="badge low" id="zBadge">--</span>
+<p class="meta" id="zMeta"></p>
+<dl>
+<dt>Risk Probability</dt><dd id="zProb">--</dd>Factor of Safety</dt><dd id="zFos">--</dd>
+<dt>Engine</dt><dd id="zEngine">--</dd>
+</dl>
+<h2>Contributing Factors</h2>
+<div id="zFactors"></div class="rec" id="zRec"></div>
+<label class="lang-select">Alert Language</label>
+<select id="langSelect">
+<option value="en">English</option>
+<option value="hi">हन्दी (Hindi)</optioption value="as">অসমীয়া (Assamese)</option>
+<option value="bn">বাংলা (Bengali)</option>
+<option value="kha">Khasi</option>
+<option value="mni">মৈতৈলোন্ (Manipuri)</option>
+</seect>
+<button class="btn btn-p" id="alertBtn">Generate Alert</button>
+<button class="btn btn-s" id="evacBtn">Evacuation Plan</button>
+<pre id="output" hidden></pre>
+</div>
+<div class="card">
+<h2>System Note</h2>
+<p style="font-size:12px;color:var(--muted)">Decision-support system. Final alerts require human approval by District Administration / SDMA.</p>
+<div>
+</div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<scrionst ZONES=[
+{id:"sk-gangtok",n:"Gangtok",s:"Sikkim",lat:27.3389,lng:88.6065,sl:47,tw:9.3,el:1650,pop:100000,h:3,sc:30,rd:["NH-10"]},
+{id:"sk-namcamchi",s:"Sikkim",lat:27.166,lng:88.366,sl:42,tw:8.9,el:1350,pop:18000,h:1,sc:14,rd:["SH-5"]},
+{id:"sk-mangan",n:"Mangan",s:"Sikkim",lat:27.43,lng:88.54,sl:45,tw:8.5,el:1900,pop:8000,h:1,sc:8,rd:["NH-10"]},
+{id:"ar-tawang",n:"Tawang",s:"Arunachal Pradesh",lat:27.5858,lng:91.8594,sl:48,tw:8.2,el:2900,pop:20000,h:1,sc:12,rd:["NH-513"]},
+{id:"ar-bomdila",n:"Bomdila",s:"Arunachal Pradesh",lat:27.245,lng:92.415,sl:46,tw:8.6,el:2400,pop:15000,h:1,sc:10,rd:["NH-513"]},
+{id:"ar-itanagar",n:"Itanagar",s:"Arunachal Pradesh",lat:27.1023,lng:93.62,sl:36,tw:8.8,el:440,pop:60000,h:2,sc:21,rd:["NH-415"]},
+{id:"ar-ziro",n:"Ziro Valley",s:"Arunachal Pradesh",lat:27.63,lng:93.83,sl:38,tw:9.1,el:1560,pop:12000,h:1,sc:9,rd:["SH-38"]},
+{id:"as-guwahati",n:"Guwahati Hills",s:"Assam",lat:26.1445,lng:91.7362,sl:29,tw:7.8,el:180,pop:960000,h:12,sc:85,rd:["NH-27","GS Road"]},
+{id:"as-haflong",n:"Hflong / Dima Hasao",s:"Assam",lat:25.17,lng:93.02,sl:41,tw:9.7,el:680,pop:47000,h:2,sc:22,rd:["NH-27"]},
+{id:"as-silchar",n:"Silchar / Cachar",s:"Assam",lat:24.8333,lng:92.7833,sl:28,tw:8.3,el:90,pop:170000,h:4,sc:38,rd:["NH-37"]},
+{id:"as-tezpur",n:"Tezpur Foothills",s:"Assam",lat:26.6338,lng:92.797,sl:25,tw:7.1,el:120,pop:110000,h:3,sc:30,rd:["NH-15"]},
+{d:"as-jorhat",n:"Jorhat",s:"Assam",lat:26.757,lng:94.208,sl:22,tw:7.5,el:116,pop:150000,h:4,sc:40,rd:["NH-37"]},
+{is-dibrugarh",n:"Dibrugarh",s:"Assam",lat:27.4728,lng:94.912,sl:20,tw:7.0,el:108,pop:150000,h:4,sc:35,rd:["NH-37"]},
+{id:"mg-shilong",n:"Shillong / East Khasi",s:"Meghalaya",lat:25.5788,lng:91.8935,sl:38,tw:9.4,el:1520,pop:350000,h:6,sc:48,rd:["NH-6"]},
+{id:"mg-cherrapunn:"Cherrapunji / Sohra",s:"Meghalaya",lat:25.2819,lng:91.723,sl:43,tw:10.8,el:1290,pop:12000,h:1,sc:16,rd:["Sohra Rd"]},
+{id:"mg-tura",n:"Tura / West Garo",s:"Meghalaya",lat:25.5198,lng:90.2205,sl:35,tw:9.0,el:530,pop:90000,h:2,sc:28,rd:["NH-218"]},
+{id:"mg-jowai",n:"Jowai",s:"Meghalaya",lat:25.45,lng:92.2,sl:33,tw:8.7,el:1350,pop:85000,h:2,sc:24,rd:["NH-218"]},
+{id:"mg-dawki",n:"Dawki / West Jaintia",s:"Meghalaya",lat:25.21,lng:92.26,sl:31,tw:8.4,el:1100,pop:25000,h:1,sc:12,rd:["SH-1"]},
+{id:"n-kohima",n:"Kohima",s:"Nagaland",lat:25.6751,lng:94.1086,sl:41,tw:9.1,el:1260,pop:100000,h:3,sc:35,rd:["NH-29"]},
+{id:"ng-dimapur",n:"Dimapur",s:"Nagaland",lat:25.901,lng:93.728,sl:26,tw:8.0,el:145,pop:120000,h:3,sc:32,rd:["NH-29"]},
+{id:"ng-mon",n:"on",s:"Nagaland",lat:26.73,lng:95.1,sl:37,tw:8.8,el:900,pop:40000,h:1,sc:15,rd:["SH-15"]},
+{id:"mn-imphal",n:"Imphal Valley Edge",s:"Manipur",lat:24.817,lng:93.9368,sl:26,tw:8.2,el:790,pop:280000,h:5,sc:55,rd:["NH-2"]},
+{id:"mn-ukhrul",n:"Ukhrul",s:"Manipur",lat:25.083,lng:94.366,sl:39,tw:9.0,el:1660,pop:45000,h:1,sc:18,rd:["NH-202"]},
+{id:"mn-senapati",n:"Senapati",s:"Manipur",lat:25.3,lng:94.1,sl:38,tw:8.9,el:1400,pop:35000,h:1,sc:14,rd:["NH-2"]},
+{id:"mz-aizawl",n:"Aizawl",s:"Mizoram",lat:23.7271,lng:92.7176,sl:43,tw:9.6,el:1130,pop:290000,h:4,sc:52,rd:["NH-54"]},
+{id:"mz-lunglei",n:"Lunglei",s:"Mizoram",lat:22.88,lng:92.75,sl:38,tw:9.2,el:950,pop:60000,h:2,sc:24,rd:["NH-54"]},
+{id:"mz-champhai",n:"Champhai",s:"Mizoram",lat:23.45,lng:93.32,sl:36,tw:8.8,el:1050,pop:35000,h:1,sc:16,rd:["NH-54"]},
+{id:"tr-agartala",n:"Agartala Uplands",s:"Tripura",lat:23.8315,lng:91.2868,sl:22,tw:7.6,el:120,pop:400000,h:6,sc:60,rd:["NH-8"]},
+{id:"tr-dharmanagar",n:"Dharmanagar",s:"Tripura",lat:24.366,lng:92.16,sl:21,tw:7.3,el:90,pop:90000,h:2,sc:25,rd:["NH-8"]},
+{iudaipur",n:"Udaipur",s:"Tripura",lat:23.53,lng:91.48,sl:20,tw:7.1,el:80,pop:50000,h:1,sc:18,rd:["SH-3"]},
+{id:"mg-nongpoh",n:"Nongpoh",s:"Meghalaya",lat:25.89,lng:91.88,sl:30,tw:8.5,el:800,pop:30000,h:1,sc:12,rd:["NH-6"]},
+{id:"as-kokrajhar",n:"Kokrajhar",s:"Assam",lat:26.4,lng:90.27,sl:23,tw:7.4,el:150,pop:130000,h:3,sc:32,rd:["NH-27"]},
+{id:"ar-pasighat",n:"Pasighat",s:"Arunachal Pradesh",lat:28.07,lng:95.33,sl:40,tw:8.7,el:700,pop:25000,h:1,sc:10,rd:["NH-515"]},
+{id:"mn-churachandpur",n:"Churachandpur",s:"Manipur",lat:24.33,lng:93.67,sl:34,tw:8.6,el:900,pop:55000,h:2,sc:20,rd:["NH-150"]},
+{id:"ng-mokokchung",n:"Mokokchung",s:"Nagaland",lat:26.32,lng:94.52,sl:39,tw:9.0,el:1325,pop:45000,h:1,sc:16,rd:["NH-61"]}
+];
+const CS={LOW:"#3e7a4f",MODERATE:"#b8960f",HIGH:"#c0392b",CRITICAL:"#7b1113"};
+let kLyr,infraLyr,sel=null,pred=null;
+const $=id=>document.getElementById(id);
+init();
+function init(){
+map=L.map("map",{preferCanvas:true}).setView([25.7,92.8],6);
+L.tileLayer"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"©OSM"}).addTo(map);
+L.ntrol.scale().addTo(map);
+riskLyr=L.layerroup().addTo(map);
+infraLyr=L.layerGroup().addTo(map);
+populateStates();
+bindUI()
+updateMap();
+addInfra();
+tick();setIval(tick,1000);
+checkNet();
+}
+function tick(){$("clock").textContent=new Date().toLocaleTimeString("en-IN")}
+function checkNet(){
+const on=navigator.onLine;
+$("statusTxt").textContent=on?"Online":"Offline Mode";
+$("statusDot").className=on?"dot":"dot off";
+}
+window.addEistener("online",checkNet);
+window.addEvistener("offline",checkNet);
+function populateStates(){
+const st=[All",...new Set(ZONES.map(z=>z.s))];
+$("stateFilter").innerHTML=st.map(s=>`<option value="${s}">${s}</option>`).join("");
+}
+function bindUI(
+$("updateBtn").onclick=update"r24").oninput=()=>$("r24v").textContent=$("r24").value;
+$("r72").oninput=()=>$("r72v").textContent=$("r72").value;
+$("r24").onchange=updateMap;
+$("r72").onchange=updateMap;
+$("stateFilter").onchange=updateMap;
+$("lyrRisk").oncange=()=>{$("lyrRisk").checked?map.addLayer(riskLyr):map.removeLayer(riskLyr)};
+$("lyrInfra").onchange=()=>{$("lyrInfra").checked?map.addLayer(infraLyr):map.removeLayer(infraLyr)};
+$("alertBtn").onclick=genAlert;
+$("evacBtn").onclick=genEvac;
+}
+function norm(v,lo,hi){return Math.max(0,Math.min(1,(v-lo)/(hi-lo))}
+function calcRisk{
+co

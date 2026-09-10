@@ -1,0 +1,21 @@
+{
+  "accuracy": 0.953,
+  "features": [
+    "slope",
+    "twi",
+    "elevation",
+    "rainfall_24h",
+    "rainfall_72h",
+    "soil_moisture"
+  ],
+  "n_samples": 10000,
+  "positive_rate": 0.2589,
+  "feature_importances": {
+    "slope": 0.2554039075641652,
+    "twi": 0.18992202944996614,
+    "elevation": 0.04621930335452274,
+    "rainfall_24h": 0.2944791720014356,
+    "rainfall_72h": 0.13787440865905257,
+    "soil_moisture": 0.07610117897085784
+  }
+}
